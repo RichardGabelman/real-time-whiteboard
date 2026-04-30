@@ -1,4 +1,23 @@
 import { useEffect, useRef, useState } from "react";
+import { Socket } from "socket.io-client";
+import type { DrawEvent } from "@shared/types";
+
+const renderStroke = (
+  ctx: CanvasRenderingContext2D,
+  from: Point,
+  to: Point,
+  strokeColor: string,
+  strokeWidth: number,
+) => {
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = strokeWidth;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.stroke();
+};
 
 interface Point {
   x: number;
@@ -7,9 +26,10 @@ interface Point {
 
 interface Props {
   boardId: string;
+  socket: Socket;
 }
 
-export default function Canvas({ boardId }: Props) {
+export default function Canvas({ boardId, socket }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
   const lastPoint = useRef<Point | null>(null);
@@ -17,9 +37,10 @@ export default function Canvas({ boardId }: Props) {
   const [lineWidth] = useState(3);
 
   useEffect(() => {
+    if (!socket) return
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
 
     const resize = () => {
@@ -32,7 +53,29 @@ export default function Canvas({ boardId }: Props) {
     resize();
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, []);
+  }, [socket]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+
+    const handleDraw = (event: DrawEvent) => {
+      renderStroke(
+        ctx,
+        { x: event.x0, y: event.y0 },
+        { x: event.x1, y: event.y1 },
+        event.color,
+        event.width,
+      );
+    };
+
+    socket.on("draw", handleDraw);
+    return () => {
+      socket.off("draw", handleDraw);
+    };
+  }, [socket]);
 
   const getPoint = (e: React.MouseEvent): Point => {
     const canvas = canvasRef.current!;
@@ -41,23 +84,6 @@ export default function Canvas({ boardId }: Props) {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     };
-  };
-
-  const drawLine = (
-    ctx: CanvasRenderingContext2D,
-    from: Point,
-    to: Point,
-    strokeColor: string,
-    strokeWidth: number,
-  ) => {
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = strokeWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.stroke();
   };
 
   const onMouseDown = (e: React.MouseEvent) => {
@@ -73,7 +99,19 @@ export default function Canvas({ boardId }: Props) {
     if (!ctx) return;
 
     const current = getPoint(e);
-    drawLine(ctx, lastPoint.current, current, color, lineWidth);
+    renderStroke(ctx, lastPoint.current, current, color, lineWidth);
+
+    const event: DrawEvent = {
+      boardId,
+      x0: lastPoint.current.x,
+      y0: lastPoint.current.y,
+      x1: current.x,
+      y1: current.y,
+      color,
+      width: lineWidth,
+    };
+    socket.emit("draw", event);
+
     lastPoint.current = current;
   };
 
