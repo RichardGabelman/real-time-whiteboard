@@ -1,26 +1,28 @@
 import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import Canvas from "./Canvas";
 
-const socket: Socket = io('http://localhost',{ path: "/socket.io" });
+const socket: Socket = io("http://localhost", { path: "/socket.io" });
 
 function App() {
   const [status, setStatus] = useState<string>("connecting...");
   const [boardId] = useState<string>("board-1");
+  const [joined, setJoined] = useState(false);
 
   useEffect(() => {
     socket.on("connect", () => {
-      console.log("connected:", socket.id);
       setStatus(`connected: ${socket.id}`);
       socket.emit("join-board", boardId);
     });
 
     socket.on("joined-board", ({ boardId }: { boardId: string }) => {
-      console.log("joined board:", boardId);
-      setStatus(`connected to board: ${boardId}`);
+      setStatus(`board: ${boardId}`);
+      setJoined(true);
     });
 
     socket.on("disconnect", () => {
       setStatus("disconnected");
+      setJoined(false);
     });
 
     return () => {
@@ -31,9 +33,28 @@ function App() {
   }, [boardId]);
 
   return (
-    <div style={{ padding: "2rem", fontFamily: "monospace" }}>
-      <h1>Whiteboard</h1>
-      <p>Status: {status}</p>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        margin: 0,
+      }}
+    >
+      <div
+        style={{
+          padding: "0.5rem 1rem",
+          borderBottom: "1px solid #eee",
+          fontFamily: "monospace",
+          fontSize: "0.8rem",
+          color: "#666",
+        }}
+      >
+        {status}
+      </div>
+      <div style={{ flex: 1, overflow: "hidden" }}>
+        {joined && <Canvas boardId={boardId} />}
+      </div>
     </div>
   );
 }
