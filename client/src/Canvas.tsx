@@ -10,6 +10,14 @@ const renderStroke = (
   strokeColor: string,
   strokeWidth: number,
 ) => {
+  if (from.x === to.x && from.y === to.y) {
+    ctx.beginPath();
+    ctx.arc(from.x, from.y, strokeWidth / 2, 0, Math.PI * 2);
+    ctx.fillStyle = strokeColor;
+    ctx.fill();
+    return;
+  }
+
   ctx.beginPath();
   ctx.moveTo(from.x, from.y);
   ctx.lineTo(to.x, to.y);
@@ -38,6 +46,7 @@ interface RemoteCursor {
 
 export default function Canvas({ boardId, socket }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const isDrawing = useRef(false);
   const lastPoint = useRef<Point | null>(null);
   const [color] = useState("#000000");
@@ -49,6 +58,7 @@ export default function Canvas({ boardId, socket }: Props) {
     if (!canvas) return;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
+    ctxRef.current = ctx;
 
     const resize = () => {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -64,12 +74,10 @@ export default function Canvas({ boardId, socket }: Props) {
 
   useEffect(() => {
     if (!socket) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return;
 
     const handleDraw = (event: DrawEvent) => {
+      const ctx = ctxRef.current;
+      if (!ctx) return;
       renderStroke(
         ctx,
         { x: event.x0, y: event.y0 },
@@ -109,9 +117,7 @@ export default function Canvas({ boardId, socket }: Props) {
     const point = getPoint(e);
     lastPoint.current = point;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = ctxRef.current;
     if (!ctx) return;
 
     ctx.beginPath();
@@ -119,7 +125,7 @@ export default function Canvas({ boardId, socket }: Props) {
     ctx.fillStyle = color;
     ctx.fill();
 
-    const drawEvent: DrawEvent = {
+    socket.emit("draw", {
       boardId,
       x0: point.x,
       y0: point.y,
@@ -127,36 +133,31 @@ export default function Canvas({ boardId, socket }: Props) {
       y1: point.y,
       color,
       width: lineWidth,
-    };
-    socket.emit("draw", drawEvent);
+    });
   };
 
   const onMouseMove = (e: React.MouseEvent) => {
     if (!socket) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
     const current = getPoint(e);
 
-    const cursorEvent: CursorEvent = {
+    socket.emit("cursor-move", {
       boardId,
       userId: socket.id ?? "",
       x: current.x,
       y: current.y,
-    };
-    socket.emit("cursor-move", cursorEvent);
+    });
 
     if (!isDrawing.current || !lastPoint.current) {
       lastPoint.current = current;
       return;
     }
 
-    const ctx = canvas.getContext("2d");
+    const ctx = ctxRef.current;
     if (!ctx) return;
 
     renderStroke(ctx, lastPoint.current, current, color, lineWidth);
 
-    const drawEvent: DrawEvent = {
+    socket.emit("draw", {
       boardId,
       x0: lastPoint.current.x,
       y0: lastPoint.current.y,
@@ -164,8 +165,7 @@ export default function Canvas({ boardId, socket }: Props) {
       y1: current.y,
       color,
       width: lineWidth,
-    };
-    socket.emit("draw", drawEvent);
+    });
 
     lastPoint.current = current;
   };
