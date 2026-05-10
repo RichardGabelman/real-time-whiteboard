@@ -1,7 +1,7 @@
 import express from "express";
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
-import type { DrawEvent } from "../../shared/types";
+import type { DrawEvent, CursorEvent } from "../../shared/types";
 
 const app = express();
 const server = createServer(app);
@@ -33,6 +33,10 @@ io.on("connection", (socket: Socket) => {
 
   socket.on("disconnect", () => {
     console.log(`[socket] client disconnected: ${socket.id}`);
+  });
+
+  socket.on("cursor-move", (event: CursorEvent) => {
+    socket.to(event.boardId).emit("cursor-move", event);
   });
 });
 

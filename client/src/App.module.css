@@ -1,0 +1,19 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  margin: 0;
+}
+
+.statusBar {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #eee;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.canvasWrapper {
+  flex: 1;
+  overflow: hidden;
+}

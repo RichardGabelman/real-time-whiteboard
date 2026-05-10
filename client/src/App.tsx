@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import Canvas from "./Canvas";
+import styles from "./App.module.css";
 
 function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -33,29 +34,10 @@ function App() {
   }, [boardId]);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        margin: 0,
-      }}
-    >
-      <div
-        style={{
-          padding: "0.5rem 1rem",
-          borderBottom: "1px solid #eee",
-          fontFamily: "monospace",
-          fontSize: "0.8rem",
-          color: "#666",
-        }}
-      >
-        {status}
-      </div>
-      <div style={{ flex: 1, overflow: "hidden" }}>
-        {joined && socket && (
-          <Canvas boardId={boardId} socket={socket} />
-        )}
+    <div className={styles.container}>
+      <div className={styles.statusBar}>{status}</div>
+      <div className={styles.canvasWrapper}>
+        {joined && socket && <Canvas boardId={boardId} socket={socket} />}
       </div>
     </div>
   );
