@@ -106,7 +106,29 @@ export default function Canvas({ boardId, socket }: Props) {
 
   const onMouseDown = (e: React.MouseEvent) => {
     isDrawing.current = true;
-    lastPoint.current = getPoint(e);
+    const point = getPoint(e);
+    lastPoint.current = point;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, lineWidth / 2, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    const drawEvent: DrawEvent = {
+      boardId,
+      x0: point.x,
+      y0: point.y,
+      x1: point.x,
+      y1: point.y,
+      color,
+      width: lineWidth,
+    };
+    socket.emit("draw", drawEvent);
   };
 
   const onMouseMove = (e: React.MouseEvent) => {
