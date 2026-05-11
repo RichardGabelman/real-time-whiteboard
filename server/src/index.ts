@@ -40,6 +40,11 @@ async function startServer() {
     io.to(boardId).emit("user-left", { socketId });
   });
 
+  await subscriber.subscribe("clear-board", (message) => {
+    const { boardId } = JSON.parse(message);
+    io.to(boardId).emit("clear-board", { boardId });
+  });
+
   app.use(express.json());
 
   app.get("/api/health", (req, res) => {
@@ -64,7 +69,9 @@ async function startServer() {
         where: { boardId },
         orderBy: { createdAt: "asc" },
       });
-      console.log(`[board-history] sending ${strokes.length} strokes to ${socket.id}`);
+      console.log(
+        `[board-history] sending ${strokes.length} strokes to ${socket.id}`,
+      );
 
       socket.emit("joined-board", { boardId });
       socket.emit("board-history", strokes);
@@ -79,8 +86,8 @@ async function startServer() {
           x1: event.x1,
           y1: event.y1,
           color: event.color,
-          width: event.width
-        }
+          width: event.width,
+        },
       });
 
       publisher.publish("draw", JSON.stringify(event));
@@ -102,6 +109,11 @@ async function startServer() {
         );
         socketBoards.delete(socket.id);
       }
+    });
+
+    socket.on("clear-board", async ({ boardId }: { boardId: string }) => {
+      await prisma.stroke.deleteMany({ where: { boardId } });
+      publisher.publish("clear-board", JSON.stringify({ boardId }));
     });
   });
 

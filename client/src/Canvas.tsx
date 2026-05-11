@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Socket } from "socket.io-client";
 import type { DrawEvent, CursorEvent } from "@shared/types";
+import type { Tool } from "./Toolbar";
 import styles from "./Canvas.module.css";
 
 const renderStroke = (
@@ -36,6 +37,9 @@ interface Point {
 interface Props {
   boardId: string;
   socket: Socket;
+  color: string;
+  lineWidth: number;
+  tool: Tool;
 }
 
 interface RemoteCursor {
@@ -44,14 +48,21 @@ interface RemoteCursor {
   y: number;
 }
 
-export default function Canvas({ boardId, socket }: Props) {
+export default function Canvas({
+  boardId,
+  socket,
+  color,
+  lineWidth,
+  tool,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const isDrawing = useRef(false);
   const lastPoint = useRef<Point | null>(null);
-  const [color] = useState("#000000");
-  const [lineWidth] = useState(3);
   const [cursors, setCursors] = useState<Record<string, RemoteCursor>>({});
+
+  const activeColor = tool === "eraser" ? "#ffffff" : color;
+  const activeWidth = tool === "eraser" ? lineWidth * 4 : lineWidth;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -118,16 +129,25 @@ export default function Canvas({ boardId, socket }: Props) {
       });
     };
 
+    const handleClear = () => {
+      const ctx = ctxRef.current;
+      const canvas = canvasRef.current;
+      if (!ctx || !canvas) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+
     socket.on("draw", handleDraw);
     socket.on("board-history", handleHistory);
     socket.on("cursor-move", handleCursor);
     socket.on("user-left", handleUserLeft);
+    socket.on('clear-board', handleClear);
 
     return () => {
       socket.off("draw", handleDraw);
       socket.off("board-history", handleHistory);
       socket.off("cursor-move", handleCursor);
       socket.off("user-left", handleUserLeft);
+      socket.off('clear-board', handleClear)
     };
   }, [socket]);
 
@@ -150,7 +170,7 @@ export default function Canvas({ boardId, socket }: Props) {
 
     ctx.beginPath();
     ctx.arc(point.x, point.y, lineWidth / 2, 0, Math.PI * 2);
-    ctx.fillStyle = color;
+    ctx.fillStyle = activeColor;
     ctx.fill();
 
     socket.emit("draw", {
@@ -160,8 +180,8 @@ export default function Canvas({ boardId, socket }: Props) {
       y0: point.y,
       x1: point.x,
       y1: point.y,
-      color,
-      width: lineWidth,
+      color: activeColor,
+      width: activeWidth,
     });
   };
 
@@ -185,7 +205,7 @@ export default function Canvas({ boardId, socket }: Props) {
     const ctx = ctxRef.current;
     if (!ctx) return;
 
-    renderStroke(ctx, lastPoint.current, current, color, lineWidth);
+    renderStroke(ctx, lastPoint.current, current, activeColor, activeWidth);
 
     socket.emit("draw", {
       boardId,
@@ -194,8 +214,8 @@ export default function Canvas({ boardId, socket }: Props) {
       y0: lastPoint.current.y,
       x1: current.x,
       y1: current.y,
-      color,
-      width: lineWidth,
+      color: activeColor,
+      width: activeWidth,
     });
 
     lastPoint.current = current;
