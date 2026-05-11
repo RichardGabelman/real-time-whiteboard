@@ -88,6 +88,20 @@ export default function Canvas({ boardId, socket }: Props) {
       );
     };
 
+    const handleHistory = (strokes: DrawEvent[]) => {
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      strokes.forEach((stroke) => {
+        renderStroke(
+          ctx,
+          { x: stroke.x0, y: stroke.y0 },
+          { x: stroke.x1, y: stroke.y1 },
+          stroke.color,
+          stroke.width,
+        );
+      });
+    };
+
     const handleCursor = (event: CursorEvent) => {
       if (event.socketId === socket.id) return;
       setCursors((prev) => ({
@@ -105,11 +119,13 @@ export default function Canvas({ boardId, socket }: Props) {
     };
 
     socket.on("draw", handleDraw);
+    socket.on("board-history", handleHistory);
     socket.on("cursor-move", handleCursor);
     socket.on("user-left", handleUserLeft);
 
     return () => {
       socket.off("draw", handleDraw);
+      socket.off("board-history", handleHistory);
       socket.off("cursor-move", handleCursor);
       socket.off("user-left", handleUserLeft);
     };

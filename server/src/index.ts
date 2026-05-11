@@ -3,6 +3,7 @@ import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import { createClient } from "redis";
 import type { DrawEvent, CursorEvent } from "../../shared/types";
+import { prisma } from "./db";
 
 const app = express();
 const server = createServer(app);
@@ -48,14 +49,40 @@ async function startServer() {
   io.on("connection", (socket: Socket) => {
     console.log(`[socket] client connected: ${socket.id} on port ${PORT}`);
 
-    socket.on("join-board", (boardId: string) => {
+    socket.on("join-board", async (boardId: string) => {
       socket.join(boardId);
       socketBoards.set(socket.id, boardId);
       console.log(`[socket] ${socket.id} joined board ${boardId}`);
+
+      await prisma.board.upsert({
+        where: { id: boardId },
+        update: {},
+        create: { id: boardId, name: boardId },
+      });
+
+      const strokes = await prisma.stroke.findMany({
+        where: { boardId },
+        orderBy: { createdAt: "asc" },
+      });
+      console.log(`[board-history] sending ${strokes.length} strokes to ${socket.id}`);
+
       socket.emit("joined-board", { boardId });
+      socket.emit("board-history", strokes);
     });
 
-    socket.on("draw", (event: DrawEvent) => {
+    socket.on("draw", async (event: DrawEvent) => {
+      await prisma.stroke.create({
+        data: {
+          boardId: event.boardId,
+          x0: event.x0,
+          y0: event.y0,
+          x1: event.x1,
+          y1: event.y1,
+          color: event.color,
+          width: event.width
+        }
+      });
+
       publisher.publish("draw", JSON.stringify(event));
     });
 

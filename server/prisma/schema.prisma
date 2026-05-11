@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Board {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  strokes   Stroke[]
+}
+
+model Stroke {
+  id        String   @id @default(cuid())
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id])
+  x0        Float
+  y0        Float
+  x1        Float
+  y1        Float
+  color     String
+  width     Float
+  createdAt DateTime @default(now())
+}

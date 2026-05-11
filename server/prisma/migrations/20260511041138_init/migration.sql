@@ -1,0 +1,26 @@
+-- CreateTable
+CREATE TABLE "Board" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Board_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Stroke" (
+    "id" TEXT NOT NULL,
+    "boardId" TEXT NOT NULL,
+    "x0" DOUBLE PRECISION NOT NULL,
+    "y0" DOUBLE PRECISION NOT NULL,
+    "x1" DOUBLE PRECISION NOT NULL,
+    "y1" DOUBLE PRECISION NOT NULL,
+    "color" TEXT NOT NULL,
+    "width" DOUBLE PRECISION NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Stroke_pkey" PRIMARY KEY ("id")
+);
+
+-- AddForeignKey
+ALTER TABLE "Stroke" ADD CONSTRAINT "Stroke_boardId_fkey" FOREIGN KEY ("boardId") REFERENCES "Board"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
