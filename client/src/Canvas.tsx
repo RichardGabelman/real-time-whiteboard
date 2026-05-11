@@ -96,12 +96,22 @@ export default function Canvas({ boardId, socket }: Props) {
       }));
     };
 
+    const handleUserLeft = ({ socketId }: { socketId: string }) => {
+      setCursors((prev) => {
+        const next = { ...prev };
+        delete next[socketId];
+        return next;
+      });
+    };
+
     socket.on("draw", handleDraw);
     socket.on("cursor-move", handleCursor);
+    socket.on("user-left", handleUserLeft);
 
     return () => {
       socket.off("draw", handleDraw);
       socket.off("cursor-move", handleCursor);
+      socket.off("user-left", handleUserLeft);
     };
   }, [socket]);
 

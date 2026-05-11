@@ -16,6 +16,8 @@ const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
 const publisher = createClient({ url: REDIS_URL });
 const subscriber = createClient({ url: REDIS_URL });
 
+const socketBoards = new Map<string, string>();
+
 async function startServer() {
   await publisher.connect();
   await subscriber.connect();
@@ -32,6 +34,11 @@ async function startServer() {
     io.to(event.boardId).emit("cursor-move", event);
   });
 
+  await subscriber.subscribe("user-left", (message) => {
+    const { socketId, boardId } = JSON.parse(message);
+    io.to(boardId).emit("user-left", { socketId });
+  });
+
   app.use(express.json());
 
   app.get("/api/health", (req, res) => {
@@ -43,6 +50,7 @@ async function startServer() {
 
     socket.on("join-board", (boardId: string) => {
       socket.join(boardId);
+      socketBoards.set(socket.id, boardId);
       console.log(`[socket] ${socket.id} joined board ${boardId}`);
       socket.emit("joined-board", { boardId });
     });
@@ -56,7 +64,17 @@ async function startServer() {
     });
 
     socket.on("disconnect", () => {
-      console.log(`[socket] client disconnected: ${socket.id}`);
+      const boardId = socketBoards.get(socket.id);
+      console.log(
+        `[socket] client disconnected: ${socket.id}, board: ${boardId}`,
+      );
+      if (boardId) {
+        publisher.publish(
+          "user-left",
+          JSON.stringify({ socketId: socket.id, boardId }),
+        );
+        socketBoards.delete(socket.id);
+      }
     });
   });
 
