@@ -76,6 +76,7 @@ export default function Canvas({ boardId, socket }: Props) {
     if (!socket) return;
 
     const handleDraw = (event: DrawEvent) => {
+      if (event.socketId === socket.id) return;
       const ctx = ctxRef.current;
       if (!ctx) return;
       renderStroke(
@@ -88,6 +89,7 @@ export default function Canvas({ boardId, socket }: Props) {
     };
 
     const handleCursor = (event: CursorEvent) => {
+      if (event.socketId === socket.id) return;
       setCursors((prev) => ({
         ...prev,
         [event.userId]: { userId: event.userId, x: event.x, y: event.y },
@@ -127,6 +129,7 @@ export default function Canvas({ boardId, socket }: Props) {
 
     socket.emit("draw", {
       boardId,
+      socketId: socket.id ?? "",
       x0: point.x,
       y0: point.y,
       x1: point.x,
@@ -142,6 +145,7 @@ export default function Canvas({ boardId, socket }: Props) {
 
     socket.emit("cursor-move", {
       boardId,
+      socketId: socket.id ?? "",
       userId: socket.id ?? "",
       x: current.x,
       y: current.y,
@@ -159,6 +163,7 @@ export default function Canvas({ boardId, socket }: Props) {
 
     socket.emit("draw", {
       boardId,
+      socketId: socket.id ?? "",
       x0: lastPoint.current.x,
       y0: lastPoint.current.y,
       x1: current.x,

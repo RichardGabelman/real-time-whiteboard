@@ -1,5 +1,6 @@
 export interface DrawEvent {
   boardId: string;
+  socketId: string;
   x0: number;
   y0: number;
   x1: number;
@@ -10,6 +11,7 @@ export interface DrawEvent {
 
 export interface CursorEvent {
   boardId: string;
+  socketId: string;
   userId: string;
   x: number;
   y: number;

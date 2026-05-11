@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
+import { createClient } from "redis";
 import type { DrawEvent, CursorEvent } from "../../shared/types";
 
 const app = express();
@@ -10,36 +11,58 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3001;
+const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
 
-app.use(express.json());
+const publisher = createClient({ url: REDIS_URL });
+const subscriber = createClient({ url: REDIS_URL });
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", port: PORT });
-});
+async function startServer() {
+  await publisher.connect();
+  await subscriber.connect();
 
-io.on("connection", (socket: Socket) => {
-  console.log(`[socket] client connected: ${socket.id} on port ${PORT}`);
+  console.log(`[redis] connected on port ${PORT}`);
 
-  socket.on("join-board", (boardId: string) => {
-    socket.join(boardId);
-    console.log(`[socket] ${socket.id} joined board ${boardId}`);
-    socket.emit("joined-board", { boardId });
+  await subscriber.subscribe("draw", (message) => {
+    const event: DrawEvent = JSON.parse(message);
+    io.to(event.boardId).emit("draw", event);
   });
 
-  socket.on("draw", (event: DrawEvent) => {
-    console.log(`[draw] board ${event.boardId} from ${socket.id}`);
-    socket.to(event.boardId).emit("draw", event);
+  await subscriber.subscribe("cursor-move", (message) => {
+    const event: CursorEvent = JSON.parse(message);
+    io.to(event.boardId).emit("cursor-move", event);
   });
 
-  socket.on("disconnect", () => {
-    console.log(`[socket] client disconnected: ${socket.id}`);
+  app.use(express.json());
+
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", port: PORT });
   });
 
-  socket.on("cursor-move", (event: CursorEvent) => {
-    socket.to(event.boardId).emit("cursor-move", event);
-  });
-});
+  io.on("connection", (socket: Socket) => {
+    console.log(`[socket] client connected: ${socket.id} on port ${PORT}`);
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+    socket.on("join-board", (boardId: string) => {
+      socket.join(boardId);
+      console.log(`[socket] ${socket.id} joined board ${boardId}`);
+      socket.emit("joined-board", { boardId });
+    });
+
+    socket.on("draw", (event: DrawEvent) => {
+      publisher.publish("draw", JSON.stringify(event));
+    });
+
+    socket.on("cursor-move", (event: CursorEvent) => {
+      publisher.publish("cursor-move", JSON.stringify(event));
+    });
+
+    socket.on("disconnect", () => {
+      console.log(`[socket] client disconnected: ${socket.id}`);
+    });
+  });
+
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+startServer().catch(console.error);
