@@ -4,6 +4,8 @@ import { Server, Socket } from "socket.io";
 import { createClient } from "redis";
 import type { DrawEvent, CursorEvent } from "../../shared/types";
 import { prisma } from "./db";
+import sessionRouter from "./routes/session";
+import boardsRouter from "./routes/boards";
 
 const app = express();
 const server = createServer(app);
@@ -46,6 +48,8 @@ async function startServer() {
   });
 
   app.use(express.json());
+  app.use("/api/session", sessionRouter);
+  app.use("/api/boards", boardsRouter);
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", port: PORT });

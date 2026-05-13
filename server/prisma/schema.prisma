@@ -7,11 +7,18 @@ datasource db {
   provider = "postgresql"
 }
 
+model Session {
+  id          String   @id @default(cuid())
+  displayName String
+  createdAt   DateTime @default(now())
+}
+
 model Board {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  strokes   Stroke[]
+  id           String   @id @default(cuid())
+  name         String
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  strokes      Stroke[]
 }
 
 model Stroke {

@@ -13,6 +13,7 @@ export interface CursorEvent {
   boardId: string;
   socketId: string;
   userId: string;
+  displayName: string;
   x: number;
   y: number;
 }
