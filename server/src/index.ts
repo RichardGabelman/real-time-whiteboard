@@ -47,6 +47,11 @@ async function startServer() {
     io.to(boardId).emit("clear-board", { boardId });
   });
 
+  await subscriber.subscribe("board-renamed", (message) => {
+    const { boardId, name } = JSON.parse(message);
+    io.to(boardId).emit("board-renamed", { boardId, name });
+  });
+
   app.use(express.json());
   app.use("/api/session", sessionRouter);
   app.use("/api/boards", boardsRouter);
@@ -58,28 +63,44 @@ async function startServer() {
   io.on("connection", (socket: Socket) => {
     console.log(`[socket] client connected: ${socket.id} on port ${PORT}`);
 
-    socket.on("join-board", async (boardId: string) => {
-      socket.join(boardId);
-      socketBoards.set(socket.id, boardId);
-      console.log(`[socket] ${socket.id} joined board ${boardId}`);
+    socket.on(
+      "join-board",
+      async (data: { boardId: string; sessionId: string }) => {
+        const { boardId, sessionId } = data;
 
-      await prisma.board.upsert({
-        where: { id: boardId },
-        update: {},
-        create: { id: boardId, name: boardId },
-      });
+        const session = await prisma.session.findUnique({
+          where: { id: sessionId },
+        });
+        if (!session) {
+          socket.emit("error", { message: "Invalid session" });
+          return;
+        }
 
-      const strokes = await prisma.stroke.findMany({
-        where: { boardId },
-        orderBy: { createdAt: "asc" },
-      });
-      console.log(
-        `[board-history] sending ${strokes.length} strokes to ${socket.id}`,
-      );
+        const board = await prisma.board.findUnique({ where: { id: boardId } });
+        if (!board) {
+          socket.emit("error", { message: "Board not found" });
+          return;
+        }
 
-      socket.emit("joined-board", { boardId });
-      socket.emit("board-history", strokes);
-    });
+        socket.join(boardId);
+        socketBoards.set(socket.id, boardId);
+        console.log(
+          `[socket] ${session.displayName} (${socket.id}) joined board ${boardId}`,
+        );
+
+        const strokes = await prisma.stroke.findMany({
+          where: { boardId },
+          orderBy: { createdAt: "asc" },
+        });
+
+        socket.emit("joined-board", {
+          boardId,
+          name: board.name,
+          displayName: session.displayName,
+        });
+        socket.emit("board-history", strokes);
+      },
+    );
 
     socket.on("draw", async (event: DrawEvent) => {
       await prisma.stroke.create({
@@ -93,7 +114,6 @@ async function startServer() {
           width: event.width,
         },
       });
-
       publisher.publish("draw", JSON.stringify(event));
     });
 
@@ -101,11 +121,21 @@ async function startServer() {
       publisher.publish("cursor-move", JSON.stringify(event));
     });
 
+    socket.on("clear-board", async ({ boardId }: { boardId: string }) => {
+      await prisma.stroke.deleteMany({ where: { boardId } });
+      publisher.publish("clear-board", JSON.stringify({ boardId }));
+    });
+
+    socket.on(
+      "rename-board",
+      async ({ boardId, name }: { boardId: string; name: string }) => {
+        await prisma.board.update({ where: { id: boardId }, data: { name } });
+        publisher.publish("board-renamed", JSON.stringify({ boardId, name }));
+      },
+    );
+
     socket.on("disconnect", () => {
       const boardId = socketBoards.get(socket.id);
-      console.log(
-        `[socket] client disconnected: ${socket.id}, board: ${boardId}`,
-      );
       if (boardId) {
         publisher.publish(
           "user-left",
@@ -113,11 +143,6 @@ async function startServer() {
         );
         socketBoards.delete(socket.id);
       }
-    });
-
-    socket.on("clear-board", async ({ boardId }: { boardId: string }) => {
-      await prisma.stroke.deleteMany({ where: { boardId } });
-      publisher.publish("clear-board", JSON.stringify({ boardId }));
     });
   });
 
