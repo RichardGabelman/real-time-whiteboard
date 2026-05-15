@@ -240,6 +240,7 @@ export default function Board() {
             color={color}
             lineWidth={lineWidth}
             tool={tool}
+            displayName={displayName}
           />
         )}
       </div>

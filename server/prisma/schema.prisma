@@ -33,3 +33,14 @@ model Stroke {
   width     Float
   createdAt DateTime @default(now())
 }
+
+model StickyNote {
+  id        String   @id @default(cuid())
+  boardId   String
+  x         Float
+  y         Float
+  content   String   @default("")
+  color     String   @default("#fef08a")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

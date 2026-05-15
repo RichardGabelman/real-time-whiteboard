@@ -1,6 +1,6 @@
 import styles from "./Toolbar.module.css";
 
-export type Tool = "pen" | "eraser";
+export type Tool = "pen" | "eraser" | "sticky-note";
 
 interface Props {
   color: string;
@@ -79,6 +79,13 @@ export default function Toolbar({
           title="Eraser"
         >
           Erase
+        </button>
+        <button
+          className={`${styles.toolButton} ${tool === "sticky-note" ? styles.active : ""}`}
+          onClick={() => onToolChange("sticky-note")}
+          title="Sticky note"
+        >
+          Note
         </button>
         <button
           className={styles.toolButton}

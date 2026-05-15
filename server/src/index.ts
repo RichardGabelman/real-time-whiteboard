@@ -2,7 +2,7 @@ import express from "express";
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import { createClient } from "redis";
-import type { DrawEvent, CursorEvent } from "../../shared/types";
+import type { DrawEvent, CursorEvent, StickyNote } from "../../shared/types";
 import { prisma } from "./db";
 import sessionRouter from "./routes/session";
 import boardsRouter from "./routes/boards";
@@ -52,6 +52,16 @@ async function startServer() {
     io.to(boardId).emit("board-renamed", { boardId, name });
   });
 
+  await subscriber.subscribe("sticky-note-update", (message) => {
+    const note: StickyNote = JSON.parse(message);
+    io.to(note.boardId).emit("sticky-note-update", note);
+  });
+
+  await subscriber.subscribe("sticky-note-delete", (message) => {
+    const { id, boardId } = JSON.parse(message);
+    io.to(boardId).emit("sticky-note-delete", { id });
+  });
+
   app.use(express.json());
   app.use("/api/session", sessionRouter);
   app.use("/api/boards", boardsRouter);
@@ -93,12 +103,18 @@ async function startServer() {
           orderBy: { createdAt: "asc" },
         });
 
+        const stickyNotes = await prisma.stickyNote.findMany({
+          where: { boardId },
+          orderBy: { createdAt: "asc" },
+        });
+
         socket.emit("joined-board", {
           boardId,
           name: board.name,
           displayName: session.displayName,
         });
         socket.emit("board-history", strokes);
+        socket.emit("sticky-notes-history", stickyNotes);
       },
     );
 
@@ -131,6 +147,39 @@ async function startServer() {
       async ({ boardId, name }: { boardId: string; name: string }) => {
         await prisma.board.update({ where: { id: boardId }, data: { name } });
         publisher.publish("board-renamed", JSON.stringify({ boardId, name }));
+      },
+    );
+
+    socket.on("sticky-note-create", async (event: StickyNote) => {
+      const note = await prisma.stickyNote.create({
+        data: {
+          id: event.id,
+          boardId: event.boardId,
+          x: event.x,
+          y: event.y,
+          content: event.content,
+          color: event.color,
+        },
+      });
+      publisher.publish("sticky-note-update", JSON.stringify(note));
+    });
+
+    socket.on("sticky-note-update", async (event: StickyNote) => {
+      const note = await prisma.stickyNote.update({
+        where: { id: event.id },
+        data: { x: event.x, y: event.y, content: event.content },
+      });
+      publisher.publish("sticky-note-update", JSON.stringify(note));
+    });
+
+    socket.on(
+      "sticky-note-delete",
+      async ({ id, boardId }: { id: string; boardId: string }) => {
+        await prisma.stickyNote.delete({ where: { id } });
+        publisher.publish(
+          "sticky-note-delete",
+          JSON.stringify({ id, boardId }),
+        );
       },
     );
 

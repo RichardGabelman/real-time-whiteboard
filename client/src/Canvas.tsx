@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Socket } from "socket.io-client";
-import type { DrawEvent, CursorEvent } from "@shared/types";
-import type { Tool } from "./Toolbar";
+import type {
+  DrawEvent,
+  CursorEvent,
+  StickyNote as StickyNoteType,
+} from "@shared/types";
+import { type Tool } from "./Toolbar";
+import StickyNoteComponent from "./StickyNote";
 import styles from "./Canvas.module.css";
+
+const generateId = () =>
+  Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 const renderStroke = (
   ctx: CanvasRenderingContext2D,
@@ -34,18 +42,20 @@ interface Point {
   y: number;
 }
 
+interface RemoteCursor {
+  userId: string;
+  displayName: string;
+  x: number;
+  y: number;
+}
+
 interface Props {
   boardId: string;
   socket: Socket;
   color: string;
   lineWidth: number;
   tool: Tool;
-}
-
-interface RemoteCursor {
-  userId: string;
-  x: number;
-  y: number;
+  displayName: string;
 }
 
 export default function Canvas({
@@ -54,12 +64,16 @@ export default function Canvas({
   color,
   lineWidth,
   tool,
+  displayName,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const isDrawing = useRef(false);
   const lastPoint = useRef<Point | null>(null);
   const [cursors, setCursors] = useState<Record<string, RemoteCursor>>({});
+  const [stickyNotes, setStickyNotes] = useState<
+    Record<string, StickyNoteType>
+  >({});
 
   const activeColor = tool === "eraser" ? "#ffffff" : color;
   const activeWidth = tool === "eraser" ? lineWidth * 4 : lineWidth;
@@ -117,7 +131,12 @@ export default function Canvas({
       if (event.socketId === socket.id) return;
       setCursors((prev) => ({
         ...prev,
-        [event.userId]: { userId: event.userId, x: event.x, y: event.y },
+        [event.userId]: {
+          userId: event.userId,
+          displayName: event.displayName,
+          x: event.x,
+          y: event.y,
+        },
       }));
     };
 
@@ -136,18 +155,44 @@ export default function Canvas({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     };
 
+    const handleStickyNoteUpdate = (note: StickyNoteType) => {
+      setStickyNotes((prev) => ({ ...prev, [note.id]: note }));
+    };
+
+    const handleStickyNoteDelete = ({ id }: { id: string }) => {
+      setStickyNotes((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    };
+
+    const handleStickyNotesHistory = (notes: StickyNoteType[]) => {
+      const map: Record<string, StickyNoteType> = {};
+      notes.forEach((n) => {
+        map[n.id] = n;
+      });
+      setStickyNotes(map);
+    };
+
     socket.on("draw", handleDraw);
     socket.on("board-history", handleHistory);
     socket.on("cursor-move", handleCursor);
     socket.on("user-left", handleUserLeft);
-    socket.on('clear-board', handleClear);
+    socket.on("clear-board", handleClear);
+    socket.on("sticky-note-update", handleStickyNoteUpdate);
+    socket.on("sticky-note-delete", handleStickyNoteDelete);
+    socket.on("sticky-notes-history", handleStickyNotesHistory);
 
     return () => {
       socket.off("draw", handleDraw);
       socket.off("board-history", handleHistory);
       socket.off("cursor-move", handleCursor);
       socket.off("user-left", handleUserLeft);
-      socket.off('clear-board', handleClear)
+      socket.off("clear-board", handleClear);
+      socket.off("sticky-note-update", handleStickyNoteUpdate);
+      socket.off("sticky-note-delete", handleStickyNoteDelete);
+      socket.off("sticky-notes-history", handleStickyNotesHistory);
     };
   }, [socket]);
 
@@ -161,6 +206,7 @@ export default function Canvas({
   };
 
   const onMouseDown = (e: React.MouseEvent) => {
+    if (tool === "sticky-note") return;
     isDrawing.current = true;
     const point = getPoint(e);
     lastPoint.current = point;
@@ -169,7 +215,7 @@ export default function Canvas({
     if (!ctx) return;
 
     ctx.beginPath();
-    ctx.arc(point.x, point.y, lineWidth / 2, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, activeWidth / 2, 0, Math.PI * 2);
     ctx.fillStyle = activeColor;
     ctx.fill();
 
@@ -193,11 +239,12 @@ export default function Canvas({
       boardId,
       socketId: socket.id ?? "",
       userId: socket.id ?? "",
+      displayName,
       x: current.x,
       y: current.y,
     });
 
-    if (!isDrawing.current || !lastPoint.current) {
+    if (!isDrawing.current || !lastPoint.current || tool === "sticky-note") {
       lastPoint.current = current;
       return;
     }
@@ -226,15 +273,52 @@ export default function Canvas({
     lastPoint.current = null;
   };
 
+  const onClick = (e: React.MouseEvent) => {
+    if (tool !== "sticky-note") return;
+    const point = getPoint(e);
+    const note: StickyNoteType = {
+      id: generateId(),
+      boardId,
+      x: point.x,
+      y: point.y,
+      content: "",
+      color: "#fef08a",
+    };
+    setStickyNotes((prev) => ({ ...prev, [note.id]: note }));
+    socket.emit("sticky-note-create", note);
+  };
+
+  const handleNoteUpdate = useCallback(
+    (note: StickyNoteType) => {
+      setStickyNotes((prev) => ({ ...prev, [note.id]: note }));
+      socket.emit("sticky-note-update", note);
+    },
+    [socket],
+  );
+
+  const handleNoteDelete = useCallback(
+    (id: string) => {
+      setStickyNotes((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      socket.emit("sticky-note-delete", { id, boardId });
+    },
+    [socket, boardId],
+  );
+
   return (
     <div className={styles.wrapper}>
       <canvas
         ref={canvasRef}
         className={styles.canvas}
+        style={{ cursor: tool === "sticky-note" ? "cell" : "crosshair" }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
+        onClick={onClick}
       />
       {Object.values(cursors).map((cursor) => (
         <div
@@ -250,10 +334,16 @@ export default function Canvas({
               strokeWidth="1"
             />
           </svg>
-          <span className={styles.cursorLabel}>
-            {cursor.userId.slice(0, 6)}
-          </span>
+          <span className={styles.cursorLabel}>{cursor.displayName}</span>
         </div>
+      ))}
+      {Object.values(stickyNotes).map((note) => (
+        <StickyNoteComponent
+          key={note.id}
+          note={note}
+          onUpdate={handleNoteUpdate}
+          onDelete={handleNoteDelete}
+        />
       ))}
     </div>
   );
