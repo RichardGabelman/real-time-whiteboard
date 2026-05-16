@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
 import { getSession, saveSession } from "../session";
 import { createSession, getBoard, verifyBoard, renameBoard } from "../api";
@@ -29,6 +29,10 @@ export default function Board() {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [boardLoading, setBoardLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+
+  const location = useLocation();
+  const verified =
+    (location.state as { verified?: boolean })?.verified ?? false;
 
   useEffect(() => {
     if (!boardId) return;
@@ -62,12 +66,13 @@ export default function Board() {
     setNameError("");
 
     try {
-      if (needsPassword && passwordInput) {
+      if (needsPassword && !verified) {
+        if (!passwordInput) {
+          setNameError("This board requires a password");
+          setLoading(false);
+          return;
+        }
         await verifyBoard(boardId, passwordInput);
-      } else if (needsPassword && !passwordInput) {
-        setNameError("This board requires a password");
-        setLoading(false);
-        return;
       }
 
       let session = getSession();
@@ -131,12 +136,12 @@ export default function Board() {
     if (boardLoading) return;
     if (joined) return;
     const session = getSession();
-    if (session && !needsPassword) {
+    if ((session && !needsPassword) || verified) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       handleJoin();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardLoading, needsPassword]);
+  }, [boardLoading, needsPassword, verified]);
 
   const handleRename = async () => {
     if (!boardId || !nameEditValue.trim()) return;

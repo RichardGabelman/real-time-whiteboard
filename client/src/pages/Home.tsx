@@ -35,7 +35,7 @@ export default function Home() {
 
       const name = boardName.trim() || `${displayName.trim()}'s Board`;
       const board = await createBoard(name, usePassword ? password : undefined);
-      navigate(`/board/${board.boardId}`);
+      navigate(`/board/${board.boardId}`, { state: { verified: true } });
     } catch (e) {
       console.log(e);
       setError("Something went wrong, try again");

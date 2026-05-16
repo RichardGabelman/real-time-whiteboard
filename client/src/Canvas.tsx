@@ -156,6 +156,7 @@ export default function Canvas({
     };
 
     const handleStickyNoteUpdate = (note: StickyNoteType) => {
+      if (note.socketId === socket.id) return;
       setStickyNotes((prev) => ({ ...prev, [note.id]: note }));
     };
 
@@ -292,7 +293,7 @@ export default function Canvas({
   const handleNoteUpdate = useCallback(
     (note: StickyNoteType) => {
       setStickyNotes((prev) => ({ ...prev, [note.id]: note }));
-      socket.emit("sticky-note-update", note);
+      socket.emit("sticky-note-update", { ...note, socketId: socket.id ?? "" });
     },
     [socket],
   );
@@ -330,7 +331,7 @@ export default function Canvas({
           color: "#fef08a",
         };
         setStickyNotes((prev) => ({ ...prev, [note.id]: note }));
-        socket.emit("sticky-note-create", note);
+        socket.emit("sticky-note-create", { ...note, socketId: socket.id ?? "" });
         return;
       }
 

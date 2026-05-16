@@ -21,6 +21,7 @@ export interface CursorEvent {
 export interface StickyNote {
   id: string;
   boardId: string;
+  socketId?: string;
   x: number;
   y: number;
   content: string;
