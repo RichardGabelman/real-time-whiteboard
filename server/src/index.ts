@@ -15,6 +15,7 @@ const io = new Server(server, {
     origin: [
       "http://localhost:5173",
       "https://real-time-whiteboard-pi.vercel.app",
+      "https://whiteboard.richardgabelman.com",
     ],
   },
 });
@@ -23,6 +24,7 @@ app.use(
     origin: [
       "http://localhost:5173",
       "https://real-time-whiteboard-pi.vercel.app",
+      "https://whiteboard.richardgabelman.com",
     ],
   }),
 );
