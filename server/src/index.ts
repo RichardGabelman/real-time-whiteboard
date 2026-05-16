@@ -10,7 +10,12 @@ import boardsRouter from "./routes/boards";
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*" },
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "https://real-time-whiteboard-pi.vercel.app",
+    ],
+  },
 });
 
 const PORT = process.env.PORT || 3001;
