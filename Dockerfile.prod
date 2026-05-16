@@ -12,4 +12,4 @@ WORKDIR /app/server
 
 RUN npm run build
 
-CMD ["node", "dist/server/src/index.js"]
+CMD npx prisma migrate deploy && node dist/server/src/index.js

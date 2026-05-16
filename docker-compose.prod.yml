@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile.prod
     restart: unless-stopped
+    ports:
+      - "3001:3001"
     environment:
       - PORT=3001
       - DATABASE_URL=${DATABASE_URL}
@@ -20,6 +22,8 @@ services:
       context: .
       dockerfile: Dockerfile.prod
     restart: unless-stopped
+    ports:
+      - "3002:3002"
     environment:
       - PORT=3002
       - DATABASE_URL=${DATABASE_URL}
@@ -39,14 +43,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - whiteboard_net
-
-  client:
-    build:
-      context: .
-      dockerfile: Dockerfile.client
-    restart: unless-stopped
     networks:
       - whiteboard_net
 

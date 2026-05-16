@@ -78,7 +78,9 @@ export default function Board() {
 
       setDisplayName(session.displayName);
 
-      const newSocket = io({ path: "/socket.io" });
+      const newSocket = io(import.meta.env.VITE_API_URL, {
+        path: "/socket.io",
+      });
       setSocket(newSocket);
 
       newSocket.on("connect", () => {
