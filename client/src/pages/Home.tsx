@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { createSession, createBoard } from "../api";
 import { saveSession, getSession } from "../session";
 import styles from "./Home.module.css";
@@ -13,6 +13,9 @@ export default function Home() {
   const [usePassword, setUsePassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const location = useLocation();
+
+  const locationError = (location.state as { error?: string })?.error ?? "";
 
   const handleCreate = async () => {
     if (!displayName.trim()) {
@@ -97,6 +100,7 @@ export default function Home() {
 
         {error && <p className={styles.error}>{error}</p>}
 
+        {locationError && <p className={styles.error}>{locationError}</p>}
         <button
           className={styles.button}
           onClick={handleCreate}

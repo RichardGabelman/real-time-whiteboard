@@ -27,6 +27,8 @@ export default function Board() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameEditValue, setNameEditValue] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const [boardLoading, setBoardLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!boardId) return;
@@ -36,7 +38,10 @@ export default function Board() {
         setBoardName(board.name);
         setNeedsPassword(board.hasPassword);
       })
-      .catch(() => navigate("/"));
+      .catch(() => {
+        navigate("/", { state: { error: "Board not found" } });
+      })
+      .finally(() => setBoardLoading(false));
   }, [boardId, navigate]);
 
   useEffect(() => {
@@ -136,7 +141,19 @@ export default function Board() {
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
+
+  if (boardLoading) {
+    return (
+      <div className={styles.joinPage}>
+        <div className={styles.joinCard}>
+          <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!joined) {
     return (
@@ -219,7 +236,7 @@ export default function Board() {
         <div className={styles.headerRight}>
           <span className={styles.userLabel}>{displayName}</span>
           <button className={styles.copyButton} onClick={handleCopyLink}>
-            Copy Link
+            {copied ? "Copied!" : "Copy Link"}
           </button>
         </div>
       </div>
