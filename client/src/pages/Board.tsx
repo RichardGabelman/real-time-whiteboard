@@ -111,7 +111,6 @@ export default function Board() {
   useEffect(() => {
     if (!sessionData || !boardId) return;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     const newSocket = io(import.meta.env.VITE_API_URL, { path: "/socket.io" });
     setSocket(newSocket); // eslint-disable-line react-hooks/set-state-in-effect
 
