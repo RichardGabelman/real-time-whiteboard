@@ -10,6 +10,7 @@ COPY shared ./shared
 
 WORKDIR /app/server
 
+RUN npx prisma generate
 RUN npm run build
 
-CMD npx prisma migrate deploy && node dist/server/src/index.js
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server/src/index.js"]
