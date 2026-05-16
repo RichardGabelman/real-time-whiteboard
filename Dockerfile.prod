@@ -12,5 +12,6 @@ WORKDIR /app/server
 
 RUN npx prisma generate
 RUN npm run build
+RUN cp -r src/generated dist/server/src/generated
 
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server/src/index.js"]
