@@ -175,7 +175,10 @@ async function startServer() {
           color: event.color,
         },
       });
-      publisher.publish("sticky-note-update", JSON.stringify(note));
+      publisher.publish(
+        "sticky-note-update",
+        JSON.stringify({ ...note, socketId: event.socketId }),
+      );
     });
 
     socket.on("sticky-note-update", async (event: StickyNote) => {
@@ -183,7 +186,10 @@ async function startServer() {
         where: { id: event.id },
         data: { x: event.x, y: event.y, content: event.content },
       });
-      publisher.publish("sticky-note-update", JSON.stringify(note));
+      publisher.publish(
+        "sticky-note-update",
+        JSON.stringify({ ...note, socketId: event.socketId }),
+      );
     });
 
     socket.on(
