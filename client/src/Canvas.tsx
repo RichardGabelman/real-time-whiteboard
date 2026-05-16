@@ -206,6 +206,7 @@ export default function Canvas({
   };
 
   const onMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
     if (tool === "sticky-note") return;
     isDrawing.current = true;
     const point = getPoint(e);
@@ -307,6 +308,123 @@ export default function Canvas({
     },
     [socket, boardId],
   );
+
+  const onTouchStart = useCallback(
+    (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const canvas = canvasRef.current!;
+      const rect = canvas.getBoundingClientRect();
+      const point = {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top,
+      };
+
+      if (tool === "sticky-note") {
+        const note: StickyNoteType = {
+          id: generateId(),
+          boardId,
+          x: point.x,
+          y: point.y,
+          content: "",
+          color: "#fef08a",
+        };
+        setStickyNotes((prev) => ({ ...prev, [note.id]: note }));
+        socket.emit("sticky-note-create", note);
+        return;
+      }
+
+      isDrawing.current = true;
+      lastPoint.current = point;
+
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, activeWidth / 2, 0, Math.PI * 2);
+      ctx.fillStyle = activeColor;
+      ctx.fill();
+
+      socket.emit("draw", {
+        boardId,
+        socketId: socket.id ?? "",
+        x0: point.x,
+        y0: point.y,
+        x1: point.x,
+        y1: point.y,
+        color: activeColor,
+        width: activeWidth,
+      });
+    },
+    [tool, boardId, socket, activeColor, activeWidth],
+  );
+
+  const onTouchMove = useCallback(
+    (e: TouchEvent) => {
+      e.preventDefault();
+      if (!isDrawing.current || !lastPoint.current) return;
+      const touch = e.touches[0];
+      const canvas = canvasRef.current!;
+      const rect = canvas.getBoundingClientRect();
+      const current = {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top,
+      };
+
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+
+      renderStroke(ctx, lastPoint.current, current, activeColor, activeWidth);
+
+      socket.emit("draw", {
+        boardId,
+        socketId: socket.id ?? "",
+        x0: lastPoint.current.x,
+        y0: lastPoint.current.y,
+        x1: current.x,
+        y1: current.y,
+        color: activeColor,
+        width: activeWidth,
+      });
+
+      lastPoint.current = current;
+    },
+    [boardId, socket, activeColor, activeWidth],
+  );
+
+  const onTouchEnd = useCallback(() => {
+    isDrawing.current = false;
+    lastPoint.current = null;
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    canvas.addEventListener(
+      "touchstart",
+      onTouchStart as unknown as EventListener,
+      { passive: false },
+    );
+    canvas.addEventListener(
+      "touchmove",
+      onTouchMove as unknown as EventListener,
+      { passive: false },
+    );
+    canvas.addEventListener("touchend", onTouchEnd, { passive: false });
+
+    return () => {
+      canvas.removeEventListener(
+        "touchstart",
+        onTouchStart as unknown as EventListener,
+      );
+      canvas.removeEventListener(
+        "touchmove",
+        onTouchMove as unknown as EventListener,
+      );
+      canvas.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [onTouchStart, onTouchMove, onTouchEnd]);
 
   return (
     <div className={styles.wrapper}>

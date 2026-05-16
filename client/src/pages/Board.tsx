@@ -125,6 +125,17 @@ export default function Board() {
     }
   };
 
+  useEffect(() => {
+    if (boardLoading) return;
+    if (joined) return;
+    const session = getSession();
+    if (session && !needsPassword) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleJoin();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardLoading, needsPassword]);
+
   const handleRename = async () => {
     if (!boardId || !nameEditValue.trim()) return;
     try {
