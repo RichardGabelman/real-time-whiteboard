@@ -10,6 +10,10 @@ import styles from "./Board.module.css";
 export default function Board() {
   const { boardId } = useParams<{ boardId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const verified =
+    (location.state as { verified?: boolean })?.verified ?? false;
+
   const [socket, setSocket] = useState<Socket | null>(null);
   const [joined, setJoined] = useState(false);
   const [boardName, setBoardName] = useState("");
@@ -17,6 +21,7 @@ export default function Board() {
   const [color, setColor] = useState("#000000");
   const [lineWidth, setLineWidth] = useState(4);
   const [tool, setTool] = useState<Tool>("pen");
+
   const [nameInput, setNameInput] = useState(
     () => getSession()?.displayName ?? "",
   );
@@ -24,15 +29,16 @@ export default function Board() {
   const [needsPassword, setNeedsPassword] = useState(false);
   const [nameError, setNameError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [boardLoading, setBoardLoading] = useState(true);
+  const [sessionData, setSessionData] = useState<{
+    sessionId: string;
+    displayName: string;
+  } | null>(null);
+
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameEditValue, setNameEditValue] = useState("");
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const [boardLoading, setBoardLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-
-  const location = useLocation();
-  const verified =
-    (location.state as { verified?: boolean })?.verified ?? false;
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!boardId) return;
@@ -82,48 +88,7 @@ export default function Board() {
       }
 
       setDisplayName(session.displayName);
-
-      const newSocket = io(import.meta.env.VITE_API_URL, {
-        path: "/socket.io",
-      });
-      setSocket(newSocket);
-
-      newSocket.on("connect", () => {
-        newSocket.emit("join-board", {
-          boardId,
-          sessionId: session!.sessionId,
-        });
-      });
-
-      newSocket.on(
-        "joined-board",
-        ({
-          name,
-          displayName: dn,
-        }: {
-          boardId: string;
-          name: string;
-          displayName: string;
-        }) => {
-          setBoardName(name);
-          setDisplayName(dn);
-          setJoined(true);
-        },
-      );
-
-      newSocket.on("board-renamed", ({ name }: { name: string }) => {
-        setBoardName(name);
-      });
-
-      newSocket.on("error", ({ message }: { message: string }) => {
-        setNameError(message);
-        newSocket.disconnect();
-        setSocket(null);
-      });
-
-      newSocket.on("disconnect", () => {
-        setJoined(false);
-      });
+      setSessionData(session);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Something went wrong";
       setNameError(message);
@@ -136,19 +101,69 @@ export default function Board() {
     if (boardLoading) return;
     if (joined) return;
     const session = getSession();
-    if ((session && !needsPassword) || verified) {
+    if (session && (!needsPassword || verified)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       handleJoin();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardLoading, needsPassword, verified]);
 
+  useEffect(() => {
+    if (!sessionData || !boardId) return;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    const newSocket = io(import.meta.env.VITE_API_URL, { path: "/socket.io" });
+    setSocket(newSocket); // eslint-disable-line react-hooks/set-state-in-effect
+
+    newSocket.on("connect", () => {
+      newSocket.emit("join-board", {
+        boardId,
+        sessionId: sessionData.sessionId,
+      });
+    });
+
+    newSocket.on(
+      "joined-board",
+      ({
+        name,
+        displayName: dn,
+      }: {
+        boardId: string;
+        name: string;
+        displayName: string;
+      }) => {
+        setBoardName(name);
+        setDisplayName(dn);
+        setJoined(true);
+      },
+    );
+
+    newSocket.on("board-renamed", ({ name }: { name: string }) => {
+      setBoardName(name);
+    });
+
+    newSocket.on("error", ({ message }: { message: string }) => {
+      setNameError(message);
+      newSocket.disconnect();
+      setSocket(null);
+      setSessionData(null);
+    });
+
+    newSocket.on("disconnect", () => {
+      setJoined(false);
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [sessionData, boardId]);
+
   const handleRename = async () => {
     if (!boardId || !nameEditValue.trim()) return;
     try {
       await renameBoard(boardId, nameEditValue.trim());
     } catch {
-      // silently fail -> name will revert
+      // silently fail
     }
     setIsEditingName(false);
   };
@@ -184,14 +199,14 @@ export default function Board() {
             <input
               className={styles.input}
               type="text"
-              placeholder="Name"
+              placeholder="Apollo"
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleJoin()}
             />
           </div>
 
-          {needsPassword && (
+          {needsPassword && !verified && (
             <div className={styles.field}>
               <label className={styles.label}>Board password</label>
               <input
