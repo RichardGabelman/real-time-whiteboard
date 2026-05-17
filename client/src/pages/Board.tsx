@@ -157,6 +157,18 @@ export default function Board() {
     };
   }, [sessionData, boardId]);
 
+  useEffect(() => {
+    if (boardName) {
+      document.title = `${boardName} - Whiteboard`;
+    } else {
+      document.title = "Whiteboard";
+    }
+
+    return () => {
+      document.title = "Whiteboard";
+    };
+  }, [boardName]);
+
   const handleRename = async () => {
     if (!boardId || !nameEditValue.trim()) return;
     try {
