@@ -1,0 +1,61 @@
+name: Server CI/CD
+
+on:
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'shared/**'
+      - 'Dockerfile.prod'
+      - 'docker-compose.prod.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'shared/**'
+      - 'Dockerfile.prod'
+      - 'docker-compose.prod.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install deps
+        working-directory: server
+        run: npm install
+
+      - name: Prisma generate
+        working-directory: server
+        run: npx prisma generate
+
+      - name: Build (typecheck + compile)
+        working-directory: server
+        run: npm run build
+
+      - name: Validate Dockerfile.prod builds
+        run: docker build -f Dockerfile.prod -t whiteboard-server-test .
+
+  deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ~/real-time-whiteboard
+            git pull origin main
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker image prune -f
