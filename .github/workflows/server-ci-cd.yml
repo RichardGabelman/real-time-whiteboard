@@ -7,6 +7,7 @@ on:
       - "shared/**"
       - "Dockerfile.prod"
       - "docker-compose.prod.yml"
+      - ".github/workflows/server-ci-cd.yml"
   push:
     branches: [main]
     paths:
@@ -14,6 +15,7 @@ on:
       - "shared/**"
       - "Dockerfile.prod"
       - "docker-compose.prod.yml"
+      - ".github/workflows/server-ci-cd.yml"
 
 jobs:
   validate:
